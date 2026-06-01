@@ -44,6 +44,7 @@ func NewAggregateCommand(cfg *config.Configuration) *cobra.Command {
 				if err := json.Unmarshal(r.Data, &inv); err != nil {
 					return fmt.Errorf("unmarshaling inventory %s: %w", r.ID, err)
 				}
+				inv.VcenterId = r.ID
 				inventories = append(inventories, inv)
 			}
 

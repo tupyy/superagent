@@ -14,10 +14,7 @@ func MergeInventories(inventories []v1alpha1.Inventory) v1alpha1.Inventory {
 
 	for _, inv := range inventories {
 		for name, data := range inv.Clusters {
-			key := name
-			if _, exists := result.Clusters[key]; exists {
-				key = inv.VcenterId + "/" + name
-			}
+			key := inv.VcenterId + "/" + name
 			result.Clusters[key] = data
 		}
 
