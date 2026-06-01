@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/google/uuid"
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/spf13/cobra"
 
@@ -48,9 +49,14 @@ func NewAggregateCommand(cfg *config.Configuration) *cobra.Command {
 
 			merged := aggregate.MergeInventories(inventories)
 
+			output := v1alpha1.UpdateInventory{
+				AgentId:   uuid.New(),
+				Inventory: merged,
+			}
+
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
-			return enc.Encode(merged)
+			return enc.Encode(output)
 		},
 	}
 
