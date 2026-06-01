@@ -82,6 +82,87 @@ export SUPERAGENT_DB=superagent.duckdb
 export SUPERAGENT_LOG_LEVEL=debug
 ```
 
+## Commands
+
+### run
+
+Starts agent containers, collects inventory and VM data, and stores results in DuckDB. See [Basic Usage](#basic-usage) above.
+
+### list
+
+Lists all collected inventories stored in the database.
+
+```bash
+bin/superagent list --db superagent.duckdb
+```
+
+Output:
+
+```
++----------+--------------------------------------------------------+--------------------------------------+---------------------+
+| SEQUENCE | VCENTER URL                                            | VCENTER ID                           | DATE                |
++----------+--------------------------------------------------------+--------------------------------------+---------------------+
+|        1 | https://vcenter-1.example.com/sdk                      | ab12cd34-ef56-7890-ab12-cd34ef567890 | 2026-06-01 16:07:16 |
+|        2 | https://vcenter-1.example.com/sdk                      | ab12cd34-ef56-7890-ab12-cd34ef567890 | 2026-06-01 16:19:57 |
++----------+--------------------------------------------------------+--------------------------------------+---------------------+
+```
+
+### aggregate
+
+Merges all inventories from a single collection sequence into one combined inventory and writes it to stdout as JSON.
+
+```bash
+bin/superagent aggregate --sequence 1 --db superagent.duckdb
+```
+
+### diff
+
+Compares virtual machines between two collection sequences for the same vCenter and outputs VMs that are present in the first sequence but missing from the second.
+
+The order of `--sequences` matters:
+- `--sequences 1,2` returns VMs in sequence 1 that are **not** in sequence 2 (i.e. VMs removed between run 1 and run 2)
+- `--sequences 2,1` returns VMs in sequence 2 that are **not** in sequence 1 (i.e. VMs added between run 1 and run 2)
+
+VM identity is based on the stable VM ID (`vm-NNNNN`) which does not change across collection runs.
+
+The `--vcenter-id` flag is required. Use `list` to find the vCenter ID for a given sequence.
+
+```bash
+bin/superagent diff \
+  --vcenter-id ab12cd34-ef56-7890-ab12-cd34ef567890 \
+  --sequences 1,2 \
+  --db superagent.duckdb
+```
+
+Table output (default):
+
+```
++--------------------------------------+----------------------+-----------+-------------+----------------+
+| VCENTER ID                           | VM NAME              | VM ID     | CLUSTER     | DATACENTER     |
++--------------------------------------+----------------------+-----------+-------------+----------------+
+| ab12cd34-ef56-7890-ab12-cd34ef567890 | web-server-01        | vm-12345  | Cluster-A   | DC-East        |
+| ab12cd34-ef56-7890-ab12-cd34ef567890 | db-replica-03        | vm-67890  | Cluster-A   | DC-East        |
++--------------------------------------+----------------------+-----------+-------------+----------------+
+```
+
+JSON output:
+
+```bash
+bin/superagent diff \
+  --vcenter-id ab12cd34-ef56-7890-ab12-cd34ef567890 \
+  --sequences 1,2 \
+  --output json
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--vcenter-id` | *required* | vCenter ID to compare |
+| `--sequences` | *required* | Comma-separated sequence pair (e.g. `1,2`) |
+| `--output` | `table` | Output format: `table` or `json` |
+| `--db` | `superagent.duckdb` | Path to DuckDB database file |
+
+If either sequence has no VMs for the given vCenter ID, the command prints an error listing available sequences.
+
 ## How It Works
 
 1. For each `--vcenter`, a containerized agent is started via Podman with port mapping starting at 18000.

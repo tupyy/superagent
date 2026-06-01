@@ -43,6 +43,9 @@ func main() {
 	}
 
 	rootCmd.AddCommand(cmd.NewRunCommand(cfg))
+	rootCmd.AddCommand(cmd.NewAggregateCommand(cfg))
+	rootCmd.AddCommand(cmd.NewListCommand(cfg))
+	rootCmd.AddCommand(cmd.NewDiffCommand(cfg))
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

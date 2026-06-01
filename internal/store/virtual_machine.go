@@ -57,6 +57,61 @@ func (s *VirtualMachineStore) SaveBatch(ctx context.Context, sequence int64, vce
 	return err
 }
 
+func (s *VirtualMachineStore) Diff(ctx context.Context, seqA, seqB int64, vcenterID string) ([]VirtualMachineRecord, error) {
+	query := `SELECT a.id, a.sequence, a.vcenter_id, a.name, a.cluster, a.datacenter,
+		a.disk_size, a.memory, a.vcenter_state, a.issue_count,
+		a.migratable, a.migration_excluded, a.template, a.collected_at
+		FROM virtual_machines a
+		WHERE a.sequence = ?
+		AND a.vcenter_id = ?
+		AND a.id NOT IN (SELECT b.id FROM virtual_machines b WHERE b.sequence = ? AND b.vcenter_id = ?)
+		ORDER BY a.name`
+
+	rows, err := s.db.QueryContext(ctx, query, seqA, vcenterID, seqB, vcenterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var records []VirtualMachineRecord
+	for rows.Next() {
+		var r VirtualMachineRecord
+		if err := rows.Scan(&r.ID, &r.Sequence, &r.VCenterID, &r.Name, &r.Cluster, &r.Datacenter,
+			&r.DiskSize, &r.Memory, &r.VCenterState, &r.IssueCount,
+			&r.Migratable, &r.MigrationExcluded, &r.Template, &r.CollectedAt); err != nil {
+			return nil, err
+		}
+		records = append(records, r)
+	}
+	return records, rows.Err()
+}
+
+func (s *VirtualMachineStore) SequencesByVCenter(ctx context.Context, vcenterID string) ([]int64, error) {
+	query, args, err := sq.Select("DISTINCT sequence").
+		From("virtual_machines").
+		Where(sq.Eq{"vcenter_id": vcenterID}).
+		OrderBy("sequence").
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var seqs []int64
+	for rows.Next() {
+		var s int64
+		if err := rows.Scan(&s); err != nil {
+			return nil, err
+		}
+		seqs = append(seqs, s)
+	}
+	return seqs, rows.Err()
+}
+
 func (s *VirtualMachineStore) List(ctx context.Context) ([]VirtualMachineRecord, error) {
 	query, args, err := sq.Select("id", "sequence", "vcenter_id", "name", "cluster", "datacenter",
 		"disk_size", "memory", "vcenter_state", "issue_count",

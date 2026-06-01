@@ -33,8 +33,37 @@ func (s *InventoryStore) Save(ctx context.Context, sequence int64, id string, vc
 	return err
 }
 
+func (s *InventoryStore) ListBySequence(ctx context.Context, sequence int64) ([]InventoryRecord, error) {
+	query, args, err := sq.Select("id", "sequence", "vcenter_url", "CAST(data AS TEXT)", "collected_at").
+		From("inventory").
+		Where(sq.Eq{"sequence": sequence}).
+		OrderBy("vcenter_url").
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var records []InventoryRecord
+	for rows.Next() {
+		var r InventoryRecord
+		var data string
+		if err := rows.Scan(&r.ID, &r.Sequence, &r.VCenterURL, &data, &r.CollectedAt); err != nil {
+			return nil, err
+		}
+		r.Data = json.RawMessage(data)
+		records = append(records, r)
+	}
+	return records, rows.Err()
+}
+
 func (s *InventoryStore) List(ctx context.Context) ([]InventoryRecord, error) {
-	query, args, err := sq.Select("id", "sequence", "vcenter_url", "data", "collected_at").
+	query, args, err := sq.Select("id", "sequence", "vcenter_url", "collected_at").
 		From("inventory").
 		OrderBy("vcenter_url").
 		ToSql()
@@ -51,7 +80,7 @@ func (s *InventoryStore) List(ctx context.Context) ([]InventoryRecord, error) {
 	var records []InventoryRecord
 	for rows.Next() {
 		var r InventoryRecord
-		if err := rows.Scan(&r.ID, &r.Sequence, &r.VCenterURL, &r.Data, &r.CollectedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.Sequence, &r.VCenterURL, &r.CollectedAt); err != nil {
 			return nil, err
 		}
 		records = append(records, r)
